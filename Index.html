@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background-color: #f2f2f2;
+      }
+      #frame {
+        max-width: 500px;
+        margin: 40px auto;
+        background: #fff;
+        padding: 20px 30px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      .top-row, .bottom-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      label {
+        font-weight: bold;
+        margin-right: 6px;
+      }
+      input, select {
+        padding: 6px 10px;
+        font-size: 14px;
+        border-radius: 4px;
+        border: 1px solid #ccc;
+      }
+      .button-row {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+      }
+      .word-button {
+        flex: 1;
+        padding: 16px;
+        border-radius: 12px;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        font-size: 16px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+      .word-button:disabled {
+        background-color: #cccccc;
+        cursor: default;
+      }
+      button {
+        padding: 8px 16px;
+        border-radius: 8px;
+        border: none;
+        background-color: #2196F3;
+        color: white;
+        font-size: 14px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+      button:disabled {
+        background-color: #cccccc;
+        cursor: default;
+      }
+      #survey {
+        display: none;
+        margin-top: 20px;
+        padding: 20px;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        text-align: center;
+      }
+      #survey h2 {
+        margin-bottom: 10px;
+      }
+      .stars {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 10px;
+      }
+      .star {
+        font-size: 32px;
+        color: grey;
+        cursor: pointer;
+        transition: transform 0.3s ease, color 0.3s ease;
+      }
+      .star.selected {
+        color: gold;
+        transform: scale(1.07) rotate(0deg);
+        animation: dance 0.5s;
+      }
+      @keyframes dance {
+        0% { transform: scale(1.07) rotate(-10deg); }
+        25% { transform: scale(1.07) rotate(10deg); }
+        50% { transform: scale(1.07) rotate(-10deg); }
+        75% { transform: scale(1.07) rotate(10deg); }
+        100% { transform: scale(1.07) rotate(0deg); }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="frame">
+      <div class="top-row">
+        <div>
+          <label for="studentId">ID:</label>
+          <input type="text" id="studentId" maxlength="4" pattern="\d{4}" placeholder="1234">
+        </div>
+        <div>
+          <label for="wordPair">Word Pair:</label>
+          <select id="wordPair"></select>
+        </div>
+      </div>
+
+      <div class="button-row">
+        <button id="btn1" class="word-button" onclick="choose(1)">Choice 1</button>
+        <button id="btn2" class="word-button" onclick="choose(2)">Choice 2</button>
+      </div>
+
+      <div class="bottom-row">
+        <button onclick="resetApp()">Reset</button>
+        <div>
+          <button onclick="next()">Next</button>
+        </div>
+        <button id="doneButton" disabled onclick="done()">Done</button>
+      </div>
+    </div>
+
+    <div id="survey">
+      <h2 id="congratsText"></h2>
+      <p>「今日のどれぐらい自信が付きましたか？」</p>
+      <div class="stars">
+        <span class="star" onclick="rate(1)">&#9733;</span>
+        <span class="star" onclick="rate(2)">&#9733;</span>
+        <span class="star" onclick="rate(3)">&#9733;</span>
+        <span class="star" onclick="rate(4)">&#9733;</span>
+        <span class="star" onclick="rate(5)">&#9733;</span>
+      </div>
+    </div>
+
+    <script>
+      let turn = 0;
+      let choices = [];
+      let pair = '';
+      let word1 = '';
+      let word2 = '';
+      let savedRow = null;
+      let submitted = false;
+
+function loadPairs() {
+  google.script.run.withSuccessHandler(function(pairs) {
+    const select = document.getElementById('wordPair');
+    select.innerHTML = '';
+
+    // Add default placeholder option
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.text = 'Choose a pair.';
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    select.add(placeholder);
+
+    // Add actual word pairs
+    pairs.forEach(function(p) {
+      let option = document.createElement('option');
+      option.value = p;
+      option.text = p;
+      select.add(option);
+    });
+
+    updateButtons();
+  }).getWordPairs();
+}
+
+      function updateButtons() {
+        const selected = document.getElementById('wordPair').value;
+        if (!selected) return;
+        const words = selected.split(' / ');
+        word1 = words[0];
+        word2 = words[1];
+        document.getElementById('btn1').innerText = word1;
+        document.getElementById('btn2').innerText = word2;
+        pair = selected;
+      }
+
+      function choose(choice) {
+        if (submitted) return;
+        choices[turn] = choice === 1 ? word1 : word2;
+        document.getElementById('btn1').disabled = true;
+        document.getElementById('btn2').disabled = true;
+      }
+
+function next() {
+  if (submitted) return;
+  if (!choices[turn]) {
+    alert('Please choose a word before clicking Next.');
+    return;
+  }
+  turn++;
+  if (turn >= 10) {
+    document.getElementById('btn1').disabled = true;
+    document.getElementById('btn2').disabled = true;
+    document.getElementById('doneButton').disabled = false;
+  } else {
+    document.getElementById('btn1').disabled = false;
+    document.getElementById('btn2').disabled = false;
+  }
+}
+
+      function resetApp() {
+        turn = 0;
+        choices = [];
+        savedRow = null;
+        submitted = false;
+        document.getElementById('doneButton').disabled = true;
+        document.getElementById('survey').style.display = 'none';
+        loadPairs();
+      }
+
+      function done() {
+        if (submitted) {
+          alert('You have already submitted your answers. Thank you!');
+          return;
+        }
+        if (turn < 10) {
+          alert('You need exactly 10 turns before submitting.');
+          return;
+        }
+        const id = document.getElementById('studentId').value.trim();
+        if (!/^\d{4}$/.test(id)) {
+          alert('Please enter a valid 4-digit ID.');
+          return;
+        }
+        document.getElementById('doneButton').disabled = true;
+        submitted = true;
+
+        const selectedChoices = choices.slice(0, 10);
+        google.script.run.withSuccessHandler(showSurvey).storeResult(id, pair, selectedChoices);
+      }
+
+      function showSurvey(result) {
+        document.getElementById('congratsText').innerText = `Great effort, ${result.studentName}! Don't give up!`;
+        document.getElementById('survey').style.display = 'block';
+        savedRow = result.row;
+      }
+
+      function rate(stars) {
+        if (!savedRow) return;
+        const allStars = document.querySelectorAll('.star');
+        allStars.forEach((s, i) => {
+          s.classList.toggle('selected', i < stars);
+        });
+        google.script.run.saveConfidence(savedRow, stars);
+      }
+
+      document.getElementById('wordPair').addEventListener('change', updateButtons);
+      window.onload = loadPairs;
+    </script>
+  </body>
+</html>
